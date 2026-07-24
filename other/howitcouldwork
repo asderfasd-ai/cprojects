@@ -1,0 +1,16 @@
+Room < struct
+	Number of room
+	Name of room
+	Description of room
+	Exits
+	Players in room
+	Objects in room
+	Effects of room
+
+
+	N	S	E	 W	NW	SW	NE	SE
+	2	4	8	16	32	64	128	256
+
+
+
+
