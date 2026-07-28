@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -14,7 +15,7 @@ struct Room {
 };
 
 typedef struct {
-  Room town[2];
+  Room town[9];
   Room trail[6];
 } World;
 
@@ -89,8 +90,11 @@ const char *get_item_names(Items c) {
   return "Unknown";
 }
 void initWorld(World *world);
+void movePlayer(playerStats *player, enum Direction dir);
+void doCommand(char command[], int size);
 void initPlayer(void);
 int printIntro(void);
+void commandLook(Room *location);
 void showInventory();
 void campFire(void);
 void commandPrompt();
@@ -101,37 +105,90 @@ Monster createMonster(void);
 
 int main() {
   World world;
+  char command[50];
   initWorld(&world);
 
   srand(time(NULL));
-  int choice = printIntro();
   initPlayer();
   player.location = &world.town[1];
-  campFire();
-  //  selectAction();
 
-  // Monster monster = createMonster();
-  // printf("a wild %s appears!\n", get_monster_names(monster));
-  // printf("hp is %d\n", monsterStat[monster].hp);
-  // printf("damage is %d\n", monsterStat[monster].dmg);
+  while (1) {
+    doCommand(command, sizeof(command));
+  }
 
   return 0;
 }
 
+void movePlayer(playerStats *player, enum Direction dir) {
+  if (player->location->exit[dir] != NULL) {
+    player->location = player->location->exit[dir];
+    printf("[%s]\n", player->location->name);
+    printf("\n%s\n", player->location->desc);
+
+    printf("\nExits:"); // DO EXITS.
+    if (player->location->exit[NORTH] != NULL)
+      printf(" north");
+    if (player->location->exit[EAST] != NULL)
+      printf(" east");
+    if (player->location->exit[WEST] != NULL)
+      printf(" west");
+    if (player->location->exit[SOUTH] != NULL)
+      printf(" south");
+    printf("\n");
+  } else {
+    printf("You can't go that way.\n");
+  }
+}
+
+void doCommand(char command[], int size) {
+  commandPrompt();
+  if (fgets(command, size, stdin) != NULL) {
+    command[strcspn(command, "\n")] = '\0';
+  }
+  if (strcmp(command, "look") == 0 || strcmp(command, "l") == 0) {
+    commandLook(player.location);
+  }
+  if (strcmp(command, "inventory") == 0 || strcmp(command, "i") == 0) {
+    showInventory();
+  }
+  if (strcmp(command, "quit") == 0 || strcmp(command, "q") == 0) {
+    printf("Goodbye.\n");
+    exit(EXIT_SUCCESS);
+  }
+  if (strcmp(command, "west") == 0 || strcmp(command, "w") == 0) {
+    movePlayer(&player, WEST);
+  }
+  if (strcmp(command, "east") == 0 || strcmp(command, "e") == 0) {
+    movePlayer(&player, EAST);
+  }
+  if (strcmp(command, "south") == 0 || strcmp(command, "s") == 0) {
+    movePlayer(&player, SOUTH);
+  }
+  if (strcmp(command, "north") == 0 || strcmp(command, "n") == 0) {
+    movePlayer(&player, NORTH);
+  }
+}
+
 void initWorld(World *world) {
+  memset(world, 0, sizeof(*world));
 
-  world->town[0].name = "Towni west\n";
-  world->town[0].desc = "\nShops n shit\n";
+  world->town[0].name = "Town west";
+  world->town[0].desc = "Shops n shit";
   world->town[0].exit[EAST] = &world->town[1];
+  world->town[0].exit[NORTH] = &world->town[2];
 
-  world->town[1].name = "Town east\n";
-  world->town[1].desc = "Second town room\n";
+  world->town[1].name = "Town east";
+  world->town[1].desc = "Second town room";
   world->town[1].exit[WEST] = &world->town[0];
+
+  world->town[2].name = "Shop";
+  world->town[2].desc = "This is a shop.";
+  world->town[2].exit[SOUTH] = &world->town[0];
 }
 
 void commandLook(Room *location) {
-  printf("%s", location->name);
-  printf("%s", location->desc);
+  printf("[%s]\n", location->name);
+  printf("\n%s\n", location->desc);
   printf("\nExits:"); // DO EXITS.
   if (location->exit[NORTH] != NULL)
     printf(" north");
@@ -168,8 +225,8 @@ int printIntro(void) {
 
 void showInventory() {
   int i;
-  printf("\n");
-  for (i = 0; i <= 10; i++) {
+  printf("You have:\n");
+  for (i = 0; i < 10; i++) {
     if (bag[i] != -1) {
       printf("%s\n", get_item_names(bag[i]));
     }
