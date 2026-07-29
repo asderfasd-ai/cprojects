@@ -5,11 +5,15 @@
 #include <unistd.h>
 
 typedef struct Room Room;
+typedef struct Object Object;
+typedef enum { RAT, CRAB, SEAGULL, JELLYFISH, SHARK, WHALE, MCOUNT } Mobile;
 enum Direction { NORTH, SOUTH, EAST, WEST, DIR_COUNT };
 
 struct Room {
   char *name;
   char *desc;
+  Object *objects;
+  Mobile *mobile;
 
   Room *exit[DIR_COUNT];
 };
@@ -19,10 +23,18 @@ typedef struct {
   Room trail[6];
 } World;
 
-typedef struct {
+struct Mobile {
+  char *name;
   int hp;
   int dmg;
-} monsterStats;
+
+  Mobile *next;
+};
+
+/*typedef struct {
+  int hp;
+  int dmg;
+} monsterStats; */
 
 typedef struct {
   int hp;
@@ -40,8 +52,10 @@ typedef struct {
 
 Equipment slot[3];
 playerStats playerStat = {100, 10, 10, 20};
-monsterStats monsterStat[6] = {{10, 1}, {15, 2}, {25, 4},
-                               {30, 6}, {50, 8}, {75, 10}};
+// Mobile mobile[6] = {{"rat", 10, 1},       {"crab", 15, 2},  {"seagull", 25,
+// 4},
+//                    {"jellyfish", 30, 6}, {"shark", 50, 8}, {"whale", 75,
+//                    10}};
 
 typedef enum {
   BANDAGE,
@@ -58,10 +72,38 @@ typedef enum {
   ICOUNT
 } Items;
 
-typedef enum { RAT, CRAB, SEAGULL, JELLYFISH, SHARK, WHALE, MCOUNT } Monster;
-const char *monster_names[] = {[WHALE] = "whale",         [SHARK] = "shark",
-                               [JELLYFISH] = "jellyfish", [SEAGULL] = "seagull",
-                               [CRAB] = "crab",           [RAT] = "rat"};
+struct Object {
+  Items type;
+  char *name;
+  char *description;
+
+  Object *next;
+};
+
+typedef struct {
+  char *name;
+  char *description;
+
+} ItemData;
+
+ItemData itemData[ICOUNT] = {
+    [BANDAGE] = {"bandage", "an unused bandage lies here."},
+    [POTION] = {"potion", "a small potion lies here."}};
+
+Object *createObject(Items item) {
+  Object *obj = malloc(sizeof(Object));
+
+  obj->type = item;
+  obj->name = itemData[item].name;
+  obj->description = itemData[item].description;
+  obj->next = NULL;
+
+  return obj;
+}
+const char *monster_names[] = {
+
+    [WHALE] = "whale",     [SHARK] = "shark", [JELLYFISH] = "jellyfish",
+    [SEAGULL] = "seagull", [CRAB] = "crab",   [RAT] = "rat"};
 const char *item_names[] = {
     [BANDAGE] = "bandage",        [POTION] = "potion",
     [KNIFE] = "small knife",      [SHORTSWORD] = "short sword",
@@ -69,7 +111,7 @@ const char *item_names[] = {
     [CLOTH] = "cloth rags",       [LEATHER] = "leather breastplate",
     [IRON] = "iron breastplate",  [STEEL] = "steel armor",
     [MITHRIL] = "mithril plate"};
-const char *get_monster_names(Monster c) {
+const char *get_monster_names(Mobile c) {
   if (c >= 0 && c < MCOUNT) {
     return monster_names[c];
   }
@@ -84,7 +126,7 @@ const char *get_item_names(Items c) {
 
 // FUNCTION PROTOTYPES
 void initWorld(World *world);
-void movePlayer(playerStats *player, enum Direction dir);
+void movePlayer(Room *location, playerStats *player, enum Direction dir);
 void doCommand(char command[], int size);
 void initPlayer(void);
 int printIntro(void);
@@ -95,7 +137,7 @@ void commandPrompt();
 void restBreak();
 int selectAction(void);
 
-Monster createMonster(void);
+Mobile createMonster(void);
 
 int main() {
   World world;
@@ -113,11 +155,17 @@ int main() {
   return 0;
 }
 
-void movePlayer(playerStats *player, enum Direction dir) {
+void movePlayer(Room *location, playerStats *player, enum Direction dir) {
   if (player->location->exit[dir] != NULL) {
     player->location = player->location->exit[dir];
     printf("[%s]\n", player->location->name);
     printf("\n%s\n", player->location->desc);
+
+    Object *obj = location->objects;
+    while (obj != NULL) {
+      printf("%s\n", obj->description);
+      obj = obj->next;
+    }
 
     printf("\nExits:"); // DO EXITS.
     if (player->location->exit[NORTH] != NULL)
@@ -133,6 +181,11 @@ void movePlayer(playerStats *player, enum Direction dir) {
     printf("You can't go that way.\n");
   }
 }
+void loadObject(Room *room, Object *obj) {
+
+  obj->next = room->objects;
+  room->objects = obj;
+}
 
 void doCommand(char command[], int size) {
   commandPrompt();
@@ -140,6 +193,8 @@ void doCommand(char command[], int size) {
     command[strcspn(command, "\n")] = '\0';
   }
   if (strcmp(command, "load") == 0) {
+    Object *obj = createObject(BANDAGE);
+    loadObject(player.location, obj);
   }
   if (strcmp(command, "look") == 0 || strcmp(command, "l") == 0) {
     commandLook(player.location);
@@ -152,16 +207,16 @@ void doCommand(char command[], int size) {
     exit(EXIT_SUCCESS);
   }
   if (strcmp(command, "west") == 0 || strcmp(command, "w") == 0) {
-    movePlayer(&player, WEST);
+    movePlayer(player.location, &player, WEST);
   }
   if (strcmp(command, "east") == 0 || strcmp(command, "e") == 0) {
-    movePlayer(&player, EAST);
+    movePlayer(player.location, &player, EAST);
   }
   if (strcmp(command, "south") == 0 || strcmp(command, "s") == 0) {
-    movePlayer(&player, SOUTH);
+    movePlayer(player.location, &player, SOUTH);
   }
   if (strcmp(command, "north") == 0 || strcmp(command, "n") == 0) {
-    movePlayer(&player, NORTH);
+    movePlayer(player.location, &player, NORTH);
   }
 }
 
@@ -183,8 +238,15 @@ void initWorld(World *world) {
 }
 
 void commandLook(Room *location) {
+  Object *obj = location->objects;
+
   printf("[%s]\n", location->name);
   printf("\n%s\n", location->desc);
+
+  while (obj != NULL) {
+    printf("%s\n", obj->description);
+    obj = obj->next;
+  }
   printf("\nExits:"); // DO EXITS.
   if (location->exit[NORTH] != NULL)
     printf(" north");
@@ -222,7 +284,7 @@ void commandPrompt() {
   printf("HP: %d SP: %d > ", playerStat.hp, playerStat.sp);
 }
 
-Monster createMonster(void) {
+Mobile createMonster(void) {
   int num = rand() % 100 + 1;
 
   if (num >= 95) {
@@ -245,10 +307,10 @@ Monster createMonster(void) {
 
 int selectAction(void) {
   int choice;
-  Monster monster = createMonster();
+  Mobile mobile = createMonster();
 
   printf("\nYou have decided to continue...\n\n\n");
-  printf("a wild %s appears!\n", get_monster_names(monster));
+  printf("a wild %s appears!\n", get_monster_names(mobile));
   printf("\nHow will you proceed?\n\n");
   printf("-----------------------------\n");
   printf("1) Attack          3) Use item\n");
