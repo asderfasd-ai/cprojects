@@ -4,6 +4,19 @@
 #include <time.h>
 #include <unistd.h>
 
+#define RESET "\x1b[0m"
+
+#define BLACK "\x1b[30m"
+#define RED "\x1b[31m"
+#define GREEN "\x1b[32m"
+#define YELLOW "\x1b[33m"
+#define BLUE "\x1b[34m"
+#define MAGENTA "\x1b[35m"
+#define CYAN "\x1b[36m"
+#define WHITE "\x1b[37m"
+
+#define BOLD "\x1b[1m"
+
 typedef struct Room Room;
 typedef struct Object Object;
 typedef struct Mobile Mobile;
@@ -213,7 +226,7 @@ void initWorld(World *world) {
 
 void commandLook(Room *location) {
   Object *obj = location->objects;
-  printf("[%s]\n", location->name);
+  printf(BOLD GREEN "\n[%s]\n" RESET, location->name);
   printf("\n%s\n", location->desc);
   while (obj != NULL) {
     printf("%s\n", obj->description);
