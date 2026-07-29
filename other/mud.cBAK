@@ -6,14 +6,15 @@
 
 typedef struct Room Room;
 typedef struct Object Object;
-typedef enum { RAT, CRAB, SEAGULL, JELLYFISH, SHARK, WHALE, MCOUNT } Mobile;
+typedef struct Mobile Mobile;
+typedef enum { RAT, CRAB, SEAGULL, JELLYFISH, SHARK, WHALE, MCOUNT } MobileType;
 enum Direction { NORTH, SOUTH, EAST, WEST, DIR_COUNT };
 
 struct Room {
   char *name;
   char *desc;
   Object *objects;
-  Mobile *mobile;
+  Mobile *mobiles;
 
   Room *exit[DIR_COUNT];
 };
@@ -24,17 +25,11 @@ typedef struct {
 } World;
 
 struct Mobile {
-  char *name;
+  MobileType type;
   int hp;
   int dmg;
-
   Mobile *next;
 };
-
-/*typedef struct {
-  int hp;
-  int dmg;
-} monsterStats; */
 
 typedef struct {
   int hp;
@@ -42,20 +37,15 @@ typedef struct {
   int sp;
   int armor;
   Room *location;
-} playerStats;
+} Player;
 
 int bag[10];
-playerStats player;
 typedef struct {
   int equippedNum;
 } Equipment;
 
+Player player = {.hp = 100, .dmg = 10, .sp = 10, .armor = 20, .location = NULL};
 Equipment slot[3];
-playerStats playerStat = {100, 10, 10, 20};
-// Mobile mobile[6] = {{"rat", 10, 1},       {"crab", 15, 2},  {"seagull", 25,
-// 4},
-//                    {"jellyfish", 30, 6}, {"shark", 50, 8}, {"whale", 75,
-//                    10}};
 
 typedef enum {
   BANDAGE,
@@ -76,14 +66,12 @@ struct Object {
   Items type;
   char *name;
   char *description;
-
   Object *next;
 };
 
 typedef struct {
   char *name;
   char *description;
-
 } ItemData;
 
 ItemData itemData[ICOUNT] = {
@@ -92,18 +80,16 @@ ItemData itemData[ICOUNT] = {
 
 Object *createObject(Items item) {
   Object *obj = malloc(sizeof(Object));
-
   obj->type = item;
   obj->name = itemData[item].name;
   obj->description = itemData[item].description;
   obj->next = NULL;
-
   return obj;
 }
-const char *monster_names[] = {
 
-    [WHALE] = "whale",     [SHARK] = "shark", [JELLYFISH] = "jellyfish",
-    [SEAGULL] = "seagull", [CRAB] = "crab",   [RAT] = "rat"};
+const char *monster_names[] = {[WHALE] = "whale",         [SHARK] = "shark",
+                               [JELLYFISH] = "jellyfish", [SEAGULL] = "seagull",
+                               [CRAB] = "crab",           [RAT] = "rat"};
 const char *item_names[] = {
     [BANDAGE] = "bandage",        [POTION] = "potion",
     [KNIFE] = "small knife",      [SHORTSWORD] = "short sword",
@@ -111,7 +97,8 @@ const char *item_names[] = {
     [CLOTH] = "cloth rags",       [LEATHER] = "leather breastplate",
     [IRON] = "iron breastplate",  [STEEL] = "steel armor",
     [MITHRIL] = "mithril plate"};
-const char *get_monster_names(Mobile c) {
+
+const char *get_monster_names(MobileType c) {
   if (c >= 0 && c < MCOUNT) {
     return monster_names[c];
   }
@@ -126,18 +113,15 @@ const char *get_item_names(Items c) {
 
 // FUNCTION PROTOTYPES
 void initWorld(World *world);
-void movePlayer(Room *location, playerStats *player, enum Direction dir);
+void movePlayer(Player *player, enum Direction dir);
 void doCommand(char command[], int size);
 void initPlayer(void);
 int printIntro(void);
 void commandLook(Room *location);
 void showInventory();
-void campFire(void);
 void commandPrompt();
-void restBreak();
-int selectAction(void);
 
-Mobile createMonster(void);
+// MobileType createMonster(void);
 
 int main() {
   World world;
@@ -151,38 +135,16 @@ int main() {
   while (1) {
     doCommand(command, sizeof(command));
   }
-
   return 0;
 }
 
-void movePlayer(Room *location, playerStats *player, enum Direction dir) {
+void movePlayer(Player *player, enum Direction dir) {
   if (player->location->exit[dir] != NULL) {
     player->location = player->location->exit[dir];
-    printf("[%s]\n", player->location->name);
-    printf("\n%s\n", player->location->desc);
-
-    Object *obj = location->objects;
-    while (obj != NULL) {
-      printf("%s\n", obj->description);
-      obj = obj->next;
-    }
-
-    printf("\nExits:"); // DO EXITS.
-    if (player->location->exit[NORTH] != NULL)
-      printf(" north");
-    if (player->location->exit[EAST] != NULL)
-      printf(" east");
-    if (player->location->exit[WEST] != NULL)
-      printf(" west");
-    if (player->location->exit[SOUTH] != NULL)
-      printf(" south");
-    printf("\n");
-  } else {
-    printf("You can't go that way.\n");
+    commandLook(player->location);
   }
 }
 void loadObject(Room *room, Object *obj) {
-
   obj->next = room->objects;
   room->objects = obj;
 }
@@ -207,16 +169,16 @@ void doCommand(char command[], int size) {
     exit(EXIT_SUCCESS);
   }
   if (strcmp(command, "west") == 0 || strcmp(command, "w") == 0) {
-    movePlayer(player.location, &player, WEST);
+    movePlayer(&player, WEST);
   }
   if (strcmp(command, "east") == 0 || strcmp(command, "e") == 0) {
-    movePlayer(player.location, &player, EAST);
+    movePlayer(&player, EAST);
   }
   if (strcmp(command, "south") == 0 || strcmp(command, "s") == 0) {
-    movePlayer(player.location, &player, SOUTH);
+    movePlayer(&player, SOUTH);
   }
   if (strcmp(command, "north") == 0 || strcmp(command, "n") == 0) {
-    movePlayer(player.location, &player, NORTH);
+    movePlayer(&player, NORTH);
   }
 }
 
@@ -239,10 +201,8 @@ void initWorld(World *world) {
 
 void commandLook(Room *location) {
   Object *obj = location->objects;
-
   printf("[%s]\n", location->name);
   printf("\n%s\n", location->desc);
-
   while (obj != NULL) {
     printf("%s\n", obj->description);
     obj = obj->next;
@@ -257,6 +217,7 @@ void commandLook(Room *location) {
   if (location->exit[SOUTH] != NULL)
     printf(" south");
   printf("\n");
+  obj = NULL;
 }
 
 void initPlayer(void) {
@@ -281,12 +242,11 @@ void showInventory() {
 }
 
 void commandPrompt() {
-  printf("HP: %d SP: %d > ", playerStat.hp, playerStat.sp);
+  printf("HP: %d SP: %d > ", player.hp, player.sp);
 }
 
-Mobile createMonster(void) {
+MobileType createMonster(void) {
   int num = rand() % 100 + 1;
-
   if (num >= 95) {
     return WHALE;
   }
@@ -303,20 +263,4 @@ Mobile createMonster(void) {
     return CRAB;
   }
   return RAT;
-}
-
-int selectAction(void) {
-  int choice;
-  Mobile mobile = createMonster();
-
-  printf("\nYou have decided to continue...\n\n\n");
-  printf("a wild %s appears!\n", get_monster_names(mobile));
-  printf("\nHow will you proceed?\n\n");
-  printf("-----------------------------\n");
-  printf("1) Attack          3) Use item\n");
-  printf("2) Cast spell      4) Run away\n");
-  printf("-----------------------------\n");
-  commandPrompt();
-  scanf("%d", &choice);
-  return choice;
 }
