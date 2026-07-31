@@ -4,8 +4,8 @@
 #include <time.h>
 #include <unistd.h>
 
+// COLORS
 #define RESET "\x1b[0m"
-
 #define BLACK "\x1b[30m"
 #define RED "\x1b[31m"
 #define GREEN "\x1b[32m"
@@ -14,7 +14,6 @@
 #define MAGENTA "\x1b[35m"
 #define CYAN "\x1b[36m"
 #define WHITE "\x1b[37m"
-
 #define BOLD "\x1b[1m"
 
 typedef struct Room Room;
@@ -51,6 +50,7 @@ typedef struct {
   int sp;
   int maxsp;
   int armor;
+  int inv[5];
   Room *location;
 } Player;
 
@@ -66,7 +66,6 @@ Player player = {.hp = 100,
                  .maxsp = 10,
                  .armor = 20,
                  .location = NULL};
-Equipment slot[3];
 
 typedef enum {
   BANDAGE,
@@ -108,6 +107,38 @@ Object *createObject(Items item) {
   return obj;
 }
 
+Object *findObject(Room *room, const char *name) {
+  Object *obj = room->objects;
+  while (obj != NULL) {
+    if (strcasecmp(obj->name, name) == 0)
+      return obj;
+    obj = obj->next;
+  }
+  return NULL;
+}
+Object *takeObject(Room *room, const char *name) {
+  Object *current = room->objects;
+  Object *previous = NULL;
+  while (current != NULL) {
+
+    if (strcasecmp(current->name, name) == 0) {
+
+      if (previous == NULL)
+        room->objects = current->next;
+      else
+        previous->next = current->next;
+
+      current->next = NULL;
+      return current;
+    }
+
+    previous = current;
+    current = current->next;
+  }
+
+  return NULL;
+}
+
 const char *mobile_names[] = {[WHALE] = "whale",         [SHARK] = "shark",
                               [JELLYFISH] = "jellyfish", [SEAGULL] = "seagull",
                               [CRAB] = "crab",           [RAT] = "rat"};
@@ -135,12 +166,14 @@ const char *get_item_names(Items c) {
 // FUNCTION PROTOTYPES
 void initWorld(World *world);
 void movePlayer(Player *player, enum Direction dir);
-void doCommand(char command[], int size);
-void initPlayer(void);
+// void doCommand(char command[], int size);
+void doCommand(Player *player, char command[], int size);
+// void initPlayer(void);
+void initPlayer(Player *player);
 int printIntro(void);
 void commandLook(Room *location);
-void showInventory();
-void commandPrompt();
+void showInventory(Player *player);
+void commandPrompt(Player *player);
 
 // MobileType createmobile(void);
 
@@ -150,11 +183,11 @@ int main() {
   initWorld(&world);
 
   srand(time(NULL));
-  initPlayer();
+  initPlayer(&player);
   player.location = &world.town[1];
 
   while (1) {
-    doCommand(command, sizeof(command));
+    doCommand(&player, command, sizeof(command));
   }
   return 0;
 }
@@ -171,39 +204,65 @@ void loadObject(Room *room, Object *obj) {
   room->objects = obj;
 }
 
-void doCommand(char command[], int size) {
-  commandPrompt();
+void doCommand(Player *player, char command[], int size) {
+  commandPrompt(player);
   if (fgets(command, size, stdin) != NULL) {
     command[strcspn(command, "\n")] = '\0';
   }
+
+  char *verb = strtok(command, " ");
+  char *arg = strtok(NULL, "");
+  if (verb == NULL) {
+    return;
+  }
   if (strcmp(command, "levelup") == 0) {
-    player.maxhp += 20;
+    player->maxhp += 20;
   }
   if (strcmp(command, "load") == 0) {
-    Object *obj = createObject(BANDAGE);
-    loadObject(player.location, obj);
+    Object *obj = createObject(POTION);
+    loadObject(player->location, obj);
   }
-  if (strcmp(command, "look") == 0 || strcmp(command, "l") == 0) {
-    commandLook(player.location);
+  if (strcmp(command, "get") == 0) {
+    if (verb == NULL)
+      return;
+    if (arg == NULL)
+      printf("Get what?");
+    else {
+      if (player->location->objects != NULL) {
+        printf("I SEE ITEMS\n");
+        Object *obj = takeObject(player->location, arg);
+        if (obj != NULL)
+          printf("Found %s\n", obj->name);
+      }
+    }
+  }
+  if (strcmp(verb, "look") == 0 || strcmp(verb, "l") == 0) {
+    if (verb == NULL)
+      return;
+    if (arg == NULL) {
+      commandLook(player->location);
+    } else {
+      printf("You don't see %s here\n", arg);
+    }
   }
   if (strcmp(command, "inventory") == 0 || strcmp(command, "i") == 0) {
-    showInventory();
+    showInventory(player);
   }
   if (strcmp(command, "quit") == 0 || strcmp(command, "q") == 0) {
     printf("Goodbye.\n");
     exit(EXIT_SUCCESS);
   }
   if (strcmp(command, "west") == 0 || strcmp(command, "w") == 0) {
-    movePlayer(&player, WEST);
+    movePlayer(player, WEST);
   }
   if (strcmp(command, "east") == 0 || strcmp(command, "e") == 0) {
-    movePlayer(&player, EAST);
+    movePlayer(player, EAST);
   }
   if (strcmp(command, "south") == 0 || strcmp(command, "s") == 0) {
-    movePlayer(&player, SOUTH);
+    movePlayer(player, SOUTH);
   }
   if (strcmp(command, "north") == 0 || strcmp(command, "n") == 0) {
-    movePlayer(&player, NORTH);
+    movePlayer(player, NORTH);
   }
 }
 
@@ -245,30 +304,30 @@ void commandLook(Room *location) {
   obj = NULL;
 }
 
-void initPlayer(void) {
+void initPlayer(Player *player) {
   int i;
   for (i = 0; i < 10; i++) {
-    bag[i] = -1;
+    player->inv[i] = -1;
   }
-  bag[0] = BANDAGE;
-  bag[1] = CLOTH;
-  bag[2] = KNIFE;
+  player->inv[0] = BANDAGE;
+  player->inv[1] = CLOTH;
+  player->inv[2] = KNIFE;
 }
 
-void showInventory() {
+void showInventory(Player *player) {
   int i;
   printf("You have:\n");
-  for (i = 0; i < 10; i++) {
-    if (bag[i] != -1) {
-      printf("%s\n", get_item_names(bag[i]));
+  for (i = 0; i < 5; i++) {
+    if (player->inv[i] != -1) {
+      printf("%s\n", get_item_names(player->inv[i]));
     }
   }
-  commandPrompt();
+  // commandPrompt(player);
 }
 
-void commandPrompt() {
-  printf("HP: %d/%d SP: %d/%d > ", player.hp, player.maxhp, player.sp,
-         player.maxsp);
+void commandPrompt(Player *player) {
+  printf("HP: %d/%d SP: %d/%d > ", player->hp, player->maxhp, player->sp,
+         player->maxsp);
 }
 
 MobileType createmobile(void) {
