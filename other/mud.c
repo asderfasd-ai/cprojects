@@ -166,16 +166,11 @@ const char *get_item_names(Items c) {
 // FUNCTION PROTOTYPES
 void initWorld(World *world);
 void movePlayer(Player *player, enum Direction dir);
-// void doCommand(char command[], int size);
 void doCommand(Player *player, char command[], int size);
-// void initPlayer(void);
 void initPlayer(Player *player);
-int printIntro(void);
 void commandLook(Room *location);
 void showInventory(Player *player);
 void commandPrompt(Player *player);
-
-// MobileType createmobile(void);
 
 int main() {
   World world;
@@ -328,24 +323,4 @@ void showInventory(Player *player) {
 void commandPrompt(Player *player) {
   printf("HP: %d/%d SP: %d/%d > ", player->hp, player->maxhp, player->sp,
          player->maxsp);
-}
-
-MobileType createmobile(void) {
-  int num = rand() % 100 + 1;
-  if (num >= 95) {
-    return WHALE;
-  }
-  if (num >= 85) {
-    return SHARK;
-  }
-  if (num >= 70) {
-    return JELLYFISH;
-  }
-  if (num >= 50) {
-    return SEAGULL;
-  }
-  if (num >= 30) {
-    return CRAB;
-  }
-  return RAT;
 }
