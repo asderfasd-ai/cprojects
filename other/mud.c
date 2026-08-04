@@ -116,6 +116,7 @@ Object *findObject(Room *room, const char *name) {
   }
   return NULL;
 }
+
 Object *takeObject(Room *room, const char *name) {
   Object *current = room->objects;
   Object *previous = NULL;
